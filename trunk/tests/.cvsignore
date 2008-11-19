@@ -1,0 +1,13 @@
+.deps
+.libs
+Makefile
+Makefile.in
+*.la
+*.lo
+*.so
+*.a
+*.dll
+*.exe
+*.o
+iridump
+
