@@ -31,10 +31,60 @@
 
 #include "p_libiri.h"
 
+static inline int
+iri__hexnibble(char c)
+{
+	if(c >= '0' && c <= '9')
+	{
+		return c - '0';
+	}
+	if(c >= 'A' && c <= 'F')
+	{
+		return c - 'A' + 10;
+	}
+	if(c >= 'a' && c <= 'f')
+	{
+		return c - 'a' + 10;
+	}
+}
+
 static inline const char *
-iri__copychar_decode(char **dest, const char *src)
+iri__copychar(char **dest, const char *src)
 {
 	**dest = *src;
+	(*dest)++;
+	src++;
+	return src;
+}
+
+static inline const char *
+iri__copychar_decode(char **dest, const char *src, int convert_space)
+{
+	unsigned char *p = (unsigned char *) (*dest);
+	
+	if(1 == convert_space && '+' == *src)
+	{
+		**dest = ' ';
+	}
+	else if('%' == *src)
+	{
+		if(0 == isxdigit(src[1]) || 0 == isxdigit(src[2]))
+		{
+			/* TODO: Deal with %u<nnnn> non-standard encoding - be liberal in
+			 * what you accept, etc.
+			 */
+			**dest = '%';
+		}
+		else
+		{
+			*p = (iri__hexnibble(src[1]) << 4) | iri__hexnibble(src[2]);
+			src += 2;
+		}
+	}
+	else
+	{
+		**dest = *src;
+	}
 	src++;
 	(*dest)++;
 	return src;
@@ -81,7 +131,7 @@ iri_parse(const char *src)
 		p->scheme = bufp;
 		while(*src && *src != ':')
 		{
-			src = iri__copychar_decode(&bufp, src);
+			src = iri__copychar_decode(&bufp, src, 0);
 		}
 		*bufp = 0;
 		bufp++;
@@ -97,7 +147,7 @@ iri_parse(const char *src)
 			p->scheme = bufp;
 			while(*src && *src != ':')
 			{
-				src = iri__copychar_decode(&bufp, src);
+				src = iri__copychar_decode(&bufp, src, 0);
 			}
 			*bufp = 0;
 			bufp++;
@@ -112,7 +162,7 @@ iri_parse(const char *src)
 		}
 		while(*src && *src != ':' && *src != '@')
 		{
-			src = iri__copychar_decode(&bufp, src);
+			src = iri__copychar_decode(&bufp, src, 0);
 		}
 		*bufp = 0;
 		bufp++;
@@ -123,7 +173,7 @@ iri_parse(const char *src)
 			p->auth = bufp;
 			while(*src && *src != ':' && *src != '@')
 			{
-				src = iri__copychar_decode(&bufp, src);
+				src = iri__copychar_decode(&bufp, src, 0);
 			}
 			*bufp = 0;
 			bufp++;
@@ -135,7 +185,7 @@ iri_parse(const char *src)
 				p->auth = bufp;
 				while(*src && *src != '@')
 				{
-					src = iri__copychar_decode(&bufp, src);
+					src = iri__copychar_decode(&bufp, src, 0);
 				}
 				*bufp = 0;
 				bufp++;
@@ -157,7 +207,7 @@ iri_parse(const char *src)
 		p->user = bufp;
 		while(*src != '@')
 		{
-			src = iri__copychar_decode(&bufp, src);
+			src = iri__copychar_decode(&bufp, src, 0);
 		}
 		*bufp = 0;
 		bufp++;
@@ -166,7 +216,7 @@ iri_parse(const char *src)
 	p->host = bufp;
 	while(*src && *src != ':' && *src != '/' && *src != '?' && *src != '#')
 	{
-		src = iri__copychar_decode(&bufp, src);
+		src = iri__copychar_decode(&bufp, src, 0);
 	}
 	*bufp = 0;
 	bufp++;
@@ -183,7 +233,7 @@ iri_parse(const char *src)
 		p->path = bufp; 
 		while(*src && *src != '?' && *src != '#')
 		{
-			src = iri__copychar_decode(&bufp, src);
+			src = iri__copychar_decode(&bufp, src, 0);
 		}
 		*bufp = 0;
 		bufp++;
@@ -194,7 +244,9 @@ iri_parse(const char *src)
 		src++;
 		while(*src && *src != '#')
 		{
-			src = iri__copychar_decode(&bufp, src);
+			/* Don't actually decode the query itself, otherwise it
+			 * can't be reliably split */
+			src = iri__copychar(&bufp, src);
 		}
 		*bufp = 0;
 		bufp++;
@@ -204,7 +256,7 @@ iri_parse(const char *src)
 		p->anchor = bufp; 
 		while(*src)
 		{
-			src = iri__copychar_decode(&bufp, src);
+			src = iri__copychar_decode(&bufp, src, 0);
 		}
 		*bufp = 0;
 		bufp++;
@@ -215,7 +267,7 @@ iri_parse(const char *src)
 		p->path = bufp; 
 		while(*src && *src != '?' && *src != '#')
 		{
-			src = iri__copychar_decode(&bufp, src);
+			src = iri__copychar_decode(&bufp, src, 0);
 		}
 		*bufp = 0;
 		bufp++;
