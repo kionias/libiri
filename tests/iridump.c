@@ -51,13 +51,14 @@ main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 	iri = iri_parse(argv[1]);
-	printf("scheme: %s\n", iri->scheme);
-	printf("  user: %s\n", iri->user);
-	printf("  auth: %s\n", iri->auth);
-	printf("  host: %s\n", iri->host);
-	printf("  port: %d\n", iri->port);
-	printf("  path: %s\n", iri->path);
-	printf(" query: %s\n", iri->query);
-	printf("anchor: %s\n", iri->anchor);
+	printf("  scheme: %s\n", iri->scheme);
+	printf("    user: %s\n", iri->user);
+	printf("    auth: %s\n", iri->auth);
+	printf("password: %s\n", iri->password);
+	printf("    host: %s\n", iri->host);
+	printf("    port: %d\n", iri->port);
+	printf("    path: %s\n", iri->path);
+	printf("   query: %s\n", iri->query);
+	printf("  anchor: %s\n", iri->anchor);
 	return 0;
 }
