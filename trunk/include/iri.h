@@ -38,15 +38,17 @@ typedef struct iri_struct iri_t;
 struct iri_struct
 {
 	void *_private;
+	const char *display;
 	const char *scheme;
 	const char *user;
 	const char *auth;
+	const char *password;
 	const char *host;
 	int port;
 	const char *path;
 	const char *query;
 	const char *anchor;
-	const char **params;
+	const char **qparams;
 };
 
 # undef EXTERNC_

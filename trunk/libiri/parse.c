@@ -147,7 +147,7 @@ iri_parse(const char *src)
 	}
 	else if(colon && at && colon < at)
 	{
-		/* This could be scheme://user[:auth]@host or [scheme:]user[:auth]@host (urgh) */
+		/* This could be scheme://user[;auth][:password]@host or [scheme:]user[;auth][:password]@host (urgh) */
 		if(colon[1] == '/')
 		{
 			p->scheme = bufp;
@@ -166,17 +166,30 @@ iri_parse(const char *src)
 		{
 			p->scheme = bufp;
 		}
-		while(*src && *src != ':' && *src != '@')
+		while(*src && *src != ':' && *src != '@' && *src != ';')
 		{
 			src = iri__copychar_decode(&bufp, src, 0);
 		}
 		*bufp = 0;
 		bufp++;
-		if(*src == ':')
+		if(*src == ';')
 		{
-			/* Following auth data */
+			/* Following authentication parameters */
 			src++;
 			p->auth = bufp;
+			while(*src && *src != ':' && *src != '@')
+			{
+				/* Don't decode, so it can be extracted properly */
+				src = iri__copychar(&bufp, src);
+			}
+			*bufp = 0;
+			bufp++;
+		}
+		if(*src == ':')
+		{
+			/* Following password data */
+			src++;
+			p->password = bufp;
 			while(*src && *src != ':' && *src != '@')
 			{
 				src = iri__copychar_decode(&bufp, src, 0);
@@ -188,7 +201,7 @@ iri_parse(const char *src)
 				src++;
 				/* It was actually scheme:user:auth@host */
 				p->user = p->auth;
-				p->auth = bufp;
+				p->password = bufp;
 				while(*src && *src != '@')
 				{
 					src = iri__copychar_decode(&bufp, src, 0);
@@ -209,15 +222,30 @@ iri_parse(const char *src)
 	}
 	else if(at)
 	{
-		/* user@host[/path...] */
+		/* user[;auth]@host[/path...] */
 		p->user = bufp;
-		while(*src != '@')
+		while(*src != '@' && *src != ';')
 		{
 			src = iri__copychar_decode(&bufp, src, 0);
 		}
 		*bufp = 0;
 		bufp++;
-		src++;
+		if(*src == ';')
+		{
+			src++;
+			p->auth = bufp;
+			while(*src && *src != '@')
+			{
+				/* Don't decode, so it can be extracted properly */
+				src = iri__copychar(&bufp, src);
+			}
+			*bufp = 0;
+			bufp++;
+		}
+		else
+		{
+			src++;
+		}
 	}
 	p->host = bufp;
 	while(*src && *src != ':' && *src != '/' && *src != '?' && *src != '#')
