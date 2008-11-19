@@ -1,4 +1,7 @@
+##
+## libiri: An IRI/URI/URL parsing library
 ## @(#) $Id$
+##
 
 ## Copyright (c) 2008 Mo McRoberts.
 ##

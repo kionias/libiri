@@ -1,4 +1,9 @@
 /*
+ * libiri: An IRI/URI/URL parsing library
+ * @(#) $Id$
+ */
+
+/*
  * Copyright (c) 2005, 2008 Mo McRoberts.
  *
  * Redistribution and use in source and binary forms, with or without

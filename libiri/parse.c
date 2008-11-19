@@ -1,4 +1,9 @@
 /*
+ * libiri: An IRI/URI/URL parsing library
+ * @(#) $Id$
+ */
+
+/*
  * Copyright (c) 2005, 2008 Mo McRoberts.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -57,6 +62,7 @@ iri__copychar(char **dest, const char *src)
 	return src;
 }
 
+/* TODO: Punycode decoding for the host part */
 static inline const char *
 iri__copychar_decode(char **dest, const char *src, int convert_space)
 {
