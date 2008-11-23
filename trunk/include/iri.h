@@ -33,11 +33,12 @@
 #ifndef IRI_H_
 # define IRI_H_                        1
 
+# if !defined(LIBIRI_INTERNAL)
 typedef struct iri_struct iri_t;
+# endif
 
 struct iri_struct
 {
-	void *_private;
 	const char *display;
 	const char *scheme;
 	const char *user;
@@ -60,5 +61,6 @@ struct iri_struct
 
 EXTERNC_ iri_t *iri_parse(const char *src);
 EXTERNC_ void iri_destroy(iri_t *iri);
+EXTERNC_ iri_t *iri_dup(iri_t *iri);
 
 #endif /* !IRI_H_ */

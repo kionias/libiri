@@ -30,22 +30,54 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef P_LIBIRI_H_
-# define P_LIBIRI_H_                   1
+#ifdef HAVE_CONFIG_H
+# include "config.h"
+#endif
 
-#include <stdlib.h>
-#include <string.h>
-#include <ctype.h>
+#include "p_libiri.h"
 
-typedef struct iri_internal_struct iri_t;
-
-#include "iri.h"
-
-struct iri_internal_struct
+static inline void
+iri__dupcopy(const char **dest, const char *src, const char *srcbase, size_t buflen, const char *destbase)
 {
-	struct iri_struct iri;
-	void *base;
-	size_t nbytes;
-};
+	if(NULL == src)
+	{
+		*dest = NULL;
+	}
+	else if(src >= srcbase && src <= srcbase + buflen)
+	{
+		*dest = destbase + (src - srcbase);
+	}
+	else
+	{
+		*dest = strdup(src);
+	}
+}
 
-#endif /* !P_LIBIRI_H_ */
+iri_t *
+iri_dup(iri_t *iri)
+{
+	iri_t *p;
+	
+	if(NULL == (p = (iri_t *) calloc(1, sizeof(iri_t))))
+	{
+		return NULL;
+	}
+	if(NULL == (p->base = (char *) calloc(1, iri->nbytes)))
+	{
+		free(p);
+		return NULL;
+	}
+	p->nbytes = iri->nbytes;
+	p->iri.port = iri->iri.port;
+	memcpy(p->base, iri->base, p->nbytes);
+	iri__dupcopy(&(p->iri.display), iri->iri.display, iri->base, iri->nbytes, p->base);
+	iri__dupcopy(&(p->iri.scheme), iri->iri.scheme, iri->base, iri->nbytes, p->base);
+	iri__dupcopy(&(p->iri.user), iri->iri.user, iri->base, iri->nbytes, p->base);
+	iri__dupcopy(&(p->iri.auth), iri->iri.auth, iri->base, iri->nbytes, p->base);
+	iri__dupcopy(&(p->iri.password), iri->iri.password, iri->base, iri->nbytes, p->base);
+	iri__dupcopy(&(p->iri.host), iri->iri.host, iri->base, iri->nbytes, p->base);
+	iri__dupcopy(&(p->iri.path), iri->iri.path, iri->base, iri->nbytes, p->base);
+	iri__dupcopy(&(p->iri.query), iri->iri.query, iri->base, iri->nbytes, p->base);
+	iri__dupcopy(&(p->iri.anchor), iri->iri.anchor, iri->base, iri->nbytes, p->base);
+	return p;
+}
