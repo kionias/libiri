@@ -97,13 +97,14 @@ iri__copychar_decode(char **dest, const char *src, int convert_space)
 }
 
 static inline char *
-iri__allocbuf(const char *src)
+iri__allocbuf(const char *src, size_t *len)
 {
 	/* Calculate the size of the buffer required to hold a decoded version of
 	 * src, including enough breathing space for null bytes.
 	 */
 	/* XXX: This is way too much; we need to actually count it */
-	return (char *) calloc(1, (strlen(src) * 4) + 16);
+	*len = (strlen(src) * 4) + 16;
+	return (char *) calloc(1, *len);
 }
 
 iri_t *
@@ -112,17 +113,19 @@ iri_parse(const char *src)
 	iri_t *p;
 	char *bufstart, *endp, *bufp;
 	const char *at, *colon, *slash;
+	size_t buflen;
 	
 	if(NULL == (p = (iri_t *) calloc(1, sizeof(iri_t))))
 	{
 		return NULL;
 	}
-	if(NULL == (bufstart = iri__allocbuf(src)))
+	if(NULL == (bufstart = iri__allocbuf(src, &buflen)))
 	{
 		free(p);
 		return NULL;
 	}
-	p->_private = bufp = bufstart;
+	p->base = bufp = bufstart;
+	p->nbytes = buflen;
 	at = strchr(src, '@');
 	slash = strchr(src, '/');
 	colon = strchr(src, ':');
@@ -134,7 +137,7 @@ iri_parse(const char *src)
 	if(colon && !at)
 	{
 		/* Definitely a scheme */
-		p->scheme = bufp;
+		p->iri.scheme = bufp;
 		while(*src && *src != ':')
 		{
 			src = iri__copychar_decode(&bufp, src, 0);
@@ -150,7 +153,7 @@ iri_parse(const char *src)
 		/* This could be scheme://user[;auth][:password]@host or [scheme:]user[;auth][:password]@host (urgh) */
 		if(colon[1] == '/')
 		{
-			p->scheme = bufp;
+			p->iri.scheme = bufp;
 			while(*src && *src != ':')
 			{
 				src = iri__copychar_decode(&bufp, src, 0);
@@ -160,11 +163,11 @@ iri_parse(const char *src)
 			src++;
 			/* src[0-1] SHOULD == '/' */
 			for(; *src == '/'; src++);
-			p->user = bufp;
+			p->iri.user = bufp;
 		}
 		else
 		{
-			p->scheme = bufp;
+			p->iri.scheme = bufp;
 		}
 		while(*src && *src != ':' && *src != '@' && *src != ';')
 		{
@@ -176,7 +179,7 @@ iri_parse(const char *src)
 		{
 			/* Following authentication parameters */
 			src++;
-			p->auth = bufp;
+			p->iri.auth = bufp;
 			while(*src && *src != ':' && *src != '@')
 			{
 				/* Don't decode, so it can be extracted properly */
@@ -189,7 +192,7 @@ iri_parse(const char *src)
 		{
 			/* Following password data */
 			src++;
-			p->password = bufp;
+			p->iri.password = bufp;
 			while(*src && *src != ':' && *src != '@')
 			{
 				src = iri__copychar_decode(&bufp, src, 0);
@@ -200,8 +203,8 @@ iri_parse(const char *src)
 			{
 				src++;
 				/* It was actually scheme:user:auth@host */
-				p->user = p->auth;
-				p->password = bufp;
+				p->iri.user = p->iri.auth;
+				p->iri.password = bufp;
 				while(*src && *src != '@')
 				{
 					src = iri__copychar_decode(&bufp, src, 0);
@@ -223,7 +226,7 @@ iri_parse(const char *src)
 	else if(at)
 	{
 		/* user[;auth]@host[/path...] */
-		p->user = bufp;
+		p->iri.user = bufp;
 		while(*src != '@' && *src != ';')
 		{
 			src = iri__copychar_decode(&bufp, src, 0);
@@ -233,7 +236,7 @@ iri_parse(const char *src)
 		if(*src == ';')
 		{
 			src++;
-			p->auth = bufp;
+			p->iri.auth = bufp;
 			while(*src && *src != '@')
 			{
 				/* Don't decode, so it can be extracted properly */
@@ -247,7 +250,7 @@ iri_parse(const char *src)
 			src++;
 		}
 	}
-	p->host = bufp;
+	p->iri.host = bufp;
 	while(*src && *src != ':' && *src != '/' && *src != '?' && *src != '#')
 	{
 		src = iri__copychar_decode(&bufp, src, 0);
@@ -259,12 +262,12 @@ iri_parse(const char *src)
 		/* Port part */
 		src++;
 		endp = (char *) src;
-		p->port = strtol(src, &endp, 10);
+		p->iri.port = strtol(src, &endp, 10);
 		src = endp;
 	}
 	if(*src == '/')
 	{
-		p->path = bufp; 
+		p->iri.path = bufp; 
 		while(*src && *src != '?' && *src != '#')
 		{
 			src = iri__copychar_decode(&bufp, src, 0);
@@ -274,7 +277,7 @@ iri_parse(const char *src)
 	}
 	if(*src == '?')
 	{
-		p->query = bufp; 
+		p->iri.query = bufp; 
 		src++;
 		while(*src && *src != '#')
 		{
@@ -287,7 +290,7 @@ iri_parse(const char *src)
 	}
 	if(*src == '#')
 	{
-		p->anchor = bufp; 
+		p->iri.anchor = bufp; 
 		while(*src)
 		{
 			src = iri__copychar_decode(&bufp, src, 0);
@@ -298,7 +301,7 @@ iri_parse(const char *src)
 	if(*src)
 	{
 		/* Still stuff left? It must be a path... of sorts */
-		p->path = bufp; 
+		p->iri.path = bufp; 
 		while(*src && *src != '?' && *src != '#')
 		{
 			src = iri__copychar_decode(&bufp, src, 0);

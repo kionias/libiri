@@ -29,7 +29,9 @@ lib_LTLIBRARIES = libiri.la
 
 libiri_la_LDFLAGS = -avoid-version
 
+libiri_la_CPPFLAGS = -DLIBIRI_INTERNAL=1
+
 libiri_la_SOURCES = \
 	p_libiri.h \
-	parse.c destroy.c
+	parse.c destroy.c dup.c
 

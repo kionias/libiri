@@ -41,7 +41,7 @@ iri_destroy(iri_t *iri)
 {
 	if(NULL != iri)
 	{
-		free(iri->_private);
+		free(iri->base);
 		free(iri);
 	}
 }
