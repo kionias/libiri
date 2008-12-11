@@ -34,7 +34,15 @@
 # include "config.h"
 #endif
 
+#include <stdio.h>
+
 #include "p_libiri.h"
+
+#undef ALIGNMENT
+#define ALIGNMENT 8
+#undef ALIGN
+#define _ALIGN(x) ((((x)+(ALIGNMENT-1))&~(ALIGNMENT-1)))
+#define ALIGN(x) (char *) _ALIGN((size_t) x)
 
 static inline int
 iri__hexnibble(char c)
@@ -99,11 +107,29 @@ iri__copychar_decode(char **dest, const char *src, int convert_space)
 static inline char *
 iri__allocbuf(const char *src, size_t *len)
 {
+	size_t sc;
+	const char *p, *c;
+	
 	/* Calculate the size of the buffer required to hold a decoded version of
 	 * src, including enough breathing space for null bytes.
 	 */
 	/* XXX: This is way too much; we need to actually count it */
 	*len = (strlen(src) * 4) + 16;
+	/* Determine how much space we need for the scheme list */
+	if(NULL != (c = strchr(src, ':')))
+	{
+		sc = 1;
+		for(p = src; p < c; p++)
+		{
+			if(*p == '+')
+			{
+				sc++;
+			}
+		}
+		/* Ensure we can align each element on an 8-byte boundary */
+		*len = (src - c) + 1 + sc + ((sc + 1) * (sizeof(char *) + 7));
+		*len += (7 * 11);
+	}
 	return (char *) calloc(1, *len);
 }
 
@@ -111,9 +137,9 @@ iri_t *
 iri_parse(const char *src)
 {
 	iri_t *p;
-	char *bufstart, *endp, *bufp;
-	const char *at, *colon, *slash;
-	size_t buflen;
+	char *bufstart, *endp, *bufp, **sl;
+	const char *at, *colon, *slash, *t;
+	size_t buflen, sc, cp;
 	
 	if(NULL == (p = (iri_t *) calloc(1, sizeof(iri_t))))
 	{
@@ -137,6 +163,7 @@ iri_parse(const char *src)
 	if(colon && !at)
 	{
 		/* Definitely a scheme */
+		bufp = ALIGN(bufp);
 		p->iri.scheme = bufp;
 		while(*src && *src != ':')
 		{
@@ -151,9 +178,11 @@ iri_parse(const char *src)
 	}
 	else if(colon && at && colon < at)
 	{
+		fprintf(stderr, "Colon occurs before at\n");
 		/* This could be scheme://user[;auth][:password]@host or [scheme:]user[;auth][:password]@host (urgh) */
-		if(colon[1] == '/' && colon[2] != '/')
+		if(colon[1] == '/' && colon[2] == '/' && colon[3] != '/')
 		{
+			bufp = ALIGN(bufp);
 			p->iri.scheme = bufp;
 			while(*src && *src != ':')
 			{
@@ -164,10 +193,14 @@ iri_parse(const char *src)
 			src++;
 			/* src[0-1] SHOULD == '/' */
 			for(; *src == '/'; src++);
+			bufp = ALIGN(bufp);
 			p->iri.user = bufp;
+			fprintf(stderr, "Found user\n");
 		}
 		else
 		{
+			fprintf(stderr, "Matched scheme\n");
+			bufp = ALIGN(bufp);
 			p->iri.scheme = bufp;
 		}
 		while(*src && *src != ':' && *src != '@' && *src != ';')
@@ -180,6 +213,7 @@ iri_parse(const char *src)
 		{
 			/* Following authentication parameters */
 			src++;
+			bufp = ALIGN(bufp);
 			p->iri.auth = bufp;
 			while(*src && *src != ':' && *src != '@')
 			{
@@ -193,6 +227,7 @@ iri_parse(const char *src)
 		{
 			/* Following password data */
 			src++;
+			bufp = ALIGN(bufp);
 			p->iri.password = bufp;
 			while(*src && *src != ':' && *src != '@')
 			{
@@ -205,6 +240,7 @@ iri_parse(const char *src)
 				src++;
 				/* It was actually scheme:user:auth@host */
 				p->iri.user = p->iri.auth;
+				bufp = ALIGN(bufp);
 				p->iri.password = bufp;
 				while(*src && *src != '@')
 				{
@@ -227,6 +263,7 @@ iri_parse(const char *src)
 	else if(at)
 	{
 		/* user[;auth]@host[/path...] */
+		bufp = ALIGN(bufp);
 		p->iri.user = bufp;
 		while(*src != '@' && *src != ';')
 		{
@@ -237,6 +274,7 @@ iri_parse(const char *src)
 		if(*src == ';')
 		{
 			src++;
+			bufp = ALIGN(bufp);
 			p->iri.auth = bufp;
 			while(*src && *src != '@')
 			{
@@ -251,6 +289,56 @@ iri_parse(const char *src)
 			src++;
 		}
 	}
+	if(NULL != p->iri.scheme)
+	{
+		sc = 1;
+		for(t = p->iri.scheme; *t; t++)
+		{
+			if('+' == *t)
+			{
+				sc++;
+			}
+		}
+		bufp = ALIGN(bufp);
+		sl = (char **) (void *) bufp;
+		bufp += (sc + 1) * sizeof(char *);
+		sc = 0;
+		cp = 0;
+		bufp = ALIGN(bufp);
+		sl[0] = bufp;
+		for(t = p->iri.scheme; *t; t++)
+		{
+			if('+' == *t)
+			{
+				if(sl[sc][0])
+				{
+					sl[sc][cp] = 0;
+					bufp++;
+					sc++;
+					bufp = ALIGN(bufp);
+					sl[sc] = bufp;
+					cp = 0;
+				}
+			}
+			else
+			{
+				sl[sc][cp] = *t;
+				bufp++;
+				cp++;
+			}
+		}
+		if(sl[sc][0])
+		{
+			sl[sc][cp] = 0;
+			sc++;
+			bufp++;
+		}
+		sl[sc] = NULL;
+		p->iri.schemelist = (const char **) sl;
+		p->iri.nschemes = sc;
+		bufp++;
+	}
+	bufp = ALIGN(bufp);
 	p->iri.host = bufp;
 	while(*src && *src != ':' && *src != '/' && *src != '?' && *src != '#')
 	{
@@ -268,7 +356,8 @@ iri_parse(const char *src)
 	}
 	if(*src == '/')
 	{
-		p->iri.path = bufp; 
+		bufp = ALIGN(bufp);
+		p->iri.path = bufp;
 		while(*src && *src != '?' && *src != '#')
 		{
 			src = iri__copychar_decode(&bufp, src, 0);
@@ -278,7 +367,8 @@ iri_parse(const char *src)
 	}
 	if(*src == '?')
 	{
-		p->iri.query = bufp; 
+		bufp = ALIGN(bufp);
+		p->iri.query = bufp;
 		src++;
 		while(*src && *src != '#')
 		{
@@ -291,6 +381,7 @@ iri_parse(const char *src)
 	}
 	if(*src == '#')
 	{
+		bufp = ALIGN(bufp);
 		p->iri.anchor = bufp; 
 		while(*src)
 		{
@@ -302,6 +393,7 @@ iri_parse(const char *src)
 	if(*src)
 	{
 		/* Still stuff left? It must be a path... of sorts */
+		bufp = ALIGN(bufp);
 		p->iri.path = bufp; 
 		while(*src && *src != '?' && *src != '#')
 		{
