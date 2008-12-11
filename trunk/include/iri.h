@@ -50,6 +50,8 @@ struct iri_struct
 	const char *query;
 	const char *anchor;
 	const char **qparams;
+	const char **schemelist;
+	size_t nschemes;
 };
 
 # undef EXTERNC_

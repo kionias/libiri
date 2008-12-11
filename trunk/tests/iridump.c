@@ -44,7 +44,8 @@ int
 main(int argc, char **argv)
 {
 	iri_t *iri;
-
+	size_t c;
+	
 	if(argc != 2)
 	{
 		fprintf(stderr, "Usage: %s IRI\n", argv[0]);
@@ -52,6 +53,10 @@ main(int argc, char **argv)
 	}
 	iri = iri_parse(argv[1]);
 	printf("  scheme: %s\n", iri->scheme);
+	for(c = 0; c < iri->nschemes; c++)
+	{
+		printf("%8d: %s\n", (int) c, iri->schemelist[c]);
+	}
 	printf("    user: %s\n", iri->user);
 	printf("    auth: %s\n", iri->auth);
 	printf("password: %s\n", iri->password);
