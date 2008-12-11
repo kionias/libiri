@@ -146,12 +146,13 @@ iri_parse(const char *src)
 		bufp++;
 		src++;
 		/* src[0-1] SHOULD == '/' */
-		for(; *src == '/'; src++);
+		if(src[0] == '/') src++;
+		if(src[0] == '/') src++;
 	}
 	else if(colon && at && colon < at)
 	{
 		/* This could be scheme://user[;auth][:password]@host or [scheme:]user[;auth][:password]@host (urgh) */
-		if(colon[1] == '/')
+		if(colon[1] == '/' && colon[2] != '/')
 		{
 			p->iri.scheme = bufp;
 			while(*src && *src != ':')
